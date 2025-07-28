@@ -1,0 +1,24 @@
+deployAs:
+  - name: service
+    applicationType: service
+    endpoint: service
+inheritAs:
+  configuration:
+    standardConfiguration:
+      - key: CTP_REGION
+        description: commercetools Composable Commerce API region
+        default: us-central1.gcp
+        required: true
+      - key: CTP_PROJECT_KEY
+        description: commercetools Composable Commerce project key
+        required: true
+      - key: CTP_CLIENT_ID
+        description: commercetools Composable Commerce client ID
+        required: true
+      - key: CTP_SCOPE
+        description: commercetools Composable Commerce client scope
+        required: true
+    securedConfiguration:
+      - key: CTP_CLIENT_SECRET
+        description: commercetools Composable Commerce client secret
+        required: true
