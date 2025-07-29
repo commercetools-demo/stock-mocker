@@ -17,12 +17,12 @@ const create = async (resource: Resource) => {
     const lineItems = order.lineItems || [];
     const totalLineItemCount = lineItems.reduce((sum: number, item: any) => sum + (item.quantity || 0), 0);
     
-    // Get total price pre-tax (in cents, so 500 USD = 50000 cents)
+    // Get total price pre-tax (in cents, so 500 EUR = 50000 cents)
     const totalPricePreTax = order.taxedPrice?.totalNet?.centAmount || order.totalPrice?.centAmount || 0;
-    const currency = order.totalPrice?.currencyCode || 'USD';
+    const currency = order.totalPrice?.currencyCode || 'EUR';
 
-    // Fraud scoring logic: fail if >10 line items AND total pre-tax >500 USD
-    if (totalLineItemCount > 10 && totalPricePreTax > 50000 && currency === 'USD') {
+    // Fraud scoring logic: fail if >10 line items AND total pre-tax >500 EUR
+    if (totalLineItemCount > 10 && totalPricePreTax > 50000 && currency === 'EUR') {
       // Return validation failure with proper Commercetools API extension error format
       const fraudError = {
         statusCode: 400,
