@@ -1,9 +1,8 @@
 import { ByProjectKeyRequestBuilder } from '@commercetools/platform-sdk/dist/declarations/src/generated/client/by-project-key-request-builder';
 
-const CART_UPDATE_EXTENSION_KEY = 'myconnector-cartUpdateExtension';
-const CART_DISCOUNT_TYPE_KEY = 'myconnector-cartDiscountType';
+const CART_UPDATE_EXTENSION_KEY = 'stock-promotion-mock-extension';
 
-export async function createCartUpdateExtension(
+export async function cartAndOrderExtension(
   apiRoot: ByProjectKeyRequestBuilder,
   applicationUrl: string
 ): Promise<void> {
@@ -43,8 +42,12 @@ export async function createCartUpdateExtension(
         },
         triggers: [
           {
+            resourceTypeId: 'order',
+            actions: ['Create'],
+          },
+          {
             resourceTypeId: 'cart',
-            actions: ['Update'],
+            actions: ['Create', 'Update'],
           },
         ],
       },
@@ -52,7 +55,7 @@ export async function createCartUpdateExtension(
     .execute();
 }
 
-export async function deleteCartUpdateExtension(
+export async function deleteCartAndOrderExtension(
   apiRoot: ByProjectKeyRequestBuilder
 ): Promise<void> {
   const {
@@ -79,58 +82,4 @@ export async function deleteCartUpdateExtension(
       })
       .execute();
   }
-}
-
-export async function createCustomCartDiscountType(
-  apiRoot: ByProjectKeyRequestBuilder
-): Promise<void> {
-  const {
-    body: { results: types },
-  } = await apiRoot
-    .types()
-    .get({
-      queryArgs: {
-        where: `key = "${CART_DISCOUNT_TYPE_KEY}"`,
-      },
-    })
-    .execute();
-
-  if (types.length > 0) {
-    const type = types[0];
-
-    await apiRoot
-      .types()
-      .withKey({ key: CART_DISCOUNT_TYPE_KEY })
-      .delete({
-        queryArgs: {
-          version: type.version,
-        },
-      })
-      .execute();
-  }
-
-  await apiRoot
-    .types()
-    .post({
-      body: {
-        key: CART_DISCOUNT_TYPE_KEY,
-        name: {
-          en: 'Custom type to store a string',
-        },
-        resourceTypeIds: ['cart-discount'],
-        fieldDefinitions: [
-          {
-            type: {
-              name: 'String',
-            },
-            name: 'customCartField',
-            label: {
-              en: 'Custom cart field',
-            },
-            required: false,
-          },
-        ],
-      },
-    })
-    .execute();
 }

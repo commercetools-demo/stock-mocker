@@ -2,6 +2,9 @@ deployAs:
   - name: service
     applicationType: service
     endpoint: service
+    scripts:
+      postDeploy: npm install && npm run connector:post-deploy
+      preUndeploy: npm install && npm run connector:pre-undeploy
 inheritAs:
   configuration:
     standardConfiguration:
