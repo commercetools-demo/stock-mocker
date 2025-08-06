@@ -2,7 +2,7 @@ import { UpdateAction } from '@commercetools/sdk-client-v2';
 import CustomError from '../errors/custom.error';
 import { Resource } from '../interfaces/resource.interface';
 import { logger } from '../utils/logger.utils';
-import { createDiscountsForNewLineItems } from '../utils/cart-discount.utils';
+import { createDiscountsForNewCustomLineItems, createDiscountsForNewLineItems } from '../utils/cart-discount.utils';
 
 /**
  * Handle the create action
@@ -30,6 +30,14 @@ const create = async (resource: Resource) => {
       updateActions.push(...discountActions);
     } else {
       logger.info('No line items in cart, no discounts to apply');
+    }
+
+    if (cart.customLineItems && cart.customLineItems.length > 0) {
+      logger.info(`Cart contains ${cart.customLineItems.length} custom line items, checking for new items to discount`);
+      const discountActions = createDiscountsForNewCustomLineItems(cart.customLineItems);
+      updateActions.push(...discountActions);
+    } else {
+      logger.info('No custom line items in cart, no discounts to apply');
     }
 
     // Return the update actions for the API extension
@@ -75,6 +83,15 @@ const update = async (resource: Resource) => {
       updateActions.push(...discountActions);
     } else {
       logger.info('No line items in cart, no discounts to apply');
+    }
+
+
+    if (cart.customLineItems && cart.customLineItems.length > 0) {
+      logger.info(`Cart contains ${cart.customLineItems.length} custom line items, checking for new items to discount`);
+      const discountActions = createDiscountsForNewCustomLineItems(cart.customLineItems);
+      updateActions.push(...discountActions);
+    } else {
+      logger.info('No custom line items in cart, no discounts to apply');
     }
 
     // Return the update actions for the API extension

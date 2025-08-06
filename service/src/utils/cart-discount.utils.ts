@@ -1,5 +1,5 @@
 import { UpdateAction } from '@commercetools/sdk-client-v2';
-import { LineItem, DirectDiscountUpdateAction } from '../interfaces/resource.interface';
+import { LineItem, DirectDiscountUpdateAction, CustomLineItem } from '../interfaces/resource.interface';
 import { logger } from './logger.utils';
 
 /**
@@ -30,7 +30,7 @@ export const generateRandomDiscountPercentage = (): number => {
  * @param {LineItem} lineItem The line item to check
  * @returns {boolean} True if the item was added recently
  */
-export const isLineItemRecentlyAdded = (lineItem: LineItem): boolean => {
+export const isLineItemRecentlyAdded = (lineItem: LineItem | CustomLineItem): boolean => {
   if (!lineItem.addedAt) {
     logger.warn(`Line item ${lineItem.id} has no addedAt timestamp`);
     return false;
@@ -57,7 +57,7 @@ export const isLineItemRecentlyAdded = (lineItem: LineItem): boolean => {
  * @param {LineItem} lineItem The line item to validate
  * @returns {boolean} True if the line item is valid
  */
-export const validateLineItem = (lineItem: LineItem): boolean => {
+export const validateLineItem = (lineItem: LineItem | CustomLineItem): boolean => {
   if (!lineItem.id) {
     logger.error('Line item missing required id field');
     return false;
@@ -81,6 +81,22 @@ export const validateLineItem = (lineItem: LineItem): boolean => {
   return true;
 };
 
+/**
+ * Get discount percentage based on variant ID
+ * @param {number} variantId The variant ID
+ * @returns {number} Discount percentage as permyriad (e.g., 1500 = 15%)
+ */
+const getDiscountByVariantId = (variantId: number): number => {
+  const discountMap: { [key: number]: number } = {
+    1: 1500, // 15%
+    2: 100,  // 1%
+    3: 200,  // 2%
+    4: 2500  // 25%
+  };
+  
+  return discountMap[variantId] || 0; // Return 0 if variant ID not found
+};
+
 export const processDiscounts = (lineItems: LineItem[]): UpdateAction[] => {
   const updateActions: UpdateAction[] = [];
   const directDiscounts: Array<{
@@ -94,10 +110,10 @@ export const processDiscounts = (lineItems: LineItem[]): UpdateAction[] => {
     };
   }> = [];
   lineItems.forEach((lineItem) => {
-    const discountPercentage = generateRandomDiscountPercentage();
+    const discountPercentage = getDiscountByVariantId(lineItem.variant.id);
 
     if (discountPercentage > 0) {
-      logger.info(`Applying ${discountPercentage / 100}% discount to line item ${lineItem.id} (Product: ${lineItem.productId})`);
+      logger.info(`Applying ${discountPercentage / 100}% discount to line item ${lineItem.id} (Product: ${lineItem.productId}, Variant: ${lineItem.variant.id})`);
 
       // Create a direct discount targeting this specific line item
       directDiscounts.push({
@@ -111,7 +127,7 @@ export const processDiscounts = (lineItems: LineItem[]): UpdateAction[] => {
         }
       });
     } else {
-      logger.info(`No discount (0%) applied to line item ${lineItem.id} (Product: ${lineItem.productId})`);
+      logger.info(`No discount (0%) applied to line item ${lineItem.id} (Product: ${lineItem.productId}, Variant: ${lineItem.variant.id})`);
     }
   });
 
@@ -128,6 +144,51 @@ export const processDiscounts = (lineItems: LineItem[]): UpdateAction[] => {
 
   return updateActions;
 }
+
+export const processDiscountsForCustomLineItems = (customLineItems: CustomLineItem[]): UpdateAction[] => {
+  const updateActions: UpdateAction[] = [];
+  const directDiscounts: Array<{
+    value: {
+      type: 'relative';
+      permyriad: number;
+    };
+    target?: {
+      type: 'customLineItems';
+      predicate: string;
+    };
+  }> = [];
+  customLineItems.forEach((lineItem) => {
+    const discountPercentage = 300;
+
+    logger.info(`Applying ${discountPercentage / 100}% discount to line item ${lineItem.id} (Product: ${lineItem.productId})`);
+
+    // Create a direct discount targeting this specific line item
+    directDiscounts.push({
+      value: {
+        type: 'relative',
+        permyriad: discountPercentage
+      },
+      target: {
+        type: 'customLineItems',
+        predicate: `true`
+      }
+    });
+  });
+
+  // If we have discounts to apply, create the update action
+  if (directDiscounts.length > 0) {
+    const setDirectDiscountsAction = {
+      action: 'setDirectDiscounts',
+      discounts: directDiscounts
+    };
+
+    updateActions.push(setDirectDiscountsAction as UpdateAction);
+    logger.info(`Created setDirectDiscounts action with ${directDiscounts.length} discounts`);
+  }
+
+  return updateActions;
+}
+
 
 /**
  * Generate a random available quantity between 1 and 100
@@ -170,7 +231,7 @@ export const determineAvailabilityFlag = (currentQuantity: number, availableQuan
  * @param {LineItem[]} lineItems Array of line items from the cart
  * @returns {UpdateAction[]} Array of update actions to set custom types
  */
-export const processStocks = (lineItems: LineItem[]): UpdateAction[] => {
+export const processStocks = (lineItems: LineItem[] | CustomLineItem[]): UpdateAction[] => {
   const updateActions: UpdateAction[] = [];
 
   if (!Array.isArray(lineItems)) {
@@ -258,10 +319,36 @@ export const createDiscountsForNewLineItems = (lineItems: LineItem[]): UpdateAct
   updateActions.push(...processDiscounts(newLineItems));
   updateActions.push(...processStocks(validLineItems));
 
-
-
-  // Create discounts for each new line item
-
-
   return updateActions;
 }; 
+
+export const createDiscountsForNewCustomLineItems = (customLineItems: CustomLineItem[]): UpdateAction[] => {
+  const updateActions: UpdateAction[] = [];
+
+  if (!Array.isArray(customLineItems)) {
+    logger.error('Invalid customLineItems input - not an array');
+    return updateActions;
+  }
+
+  // Validate and filter line items
+  const validLineItems = customLineItems.filter(validateLineItem);
+
+  if (validLineItems.length !== customLineItems.length) {
+    logger.warn(`${customLineItems.length - validLineItems.length} invalid line items filtered out`);
+  }
+
+  // Find recently added line items
+  const newLineItems = validLineItems.filter(isLineItemRecentlyAdded);
+
+  if (newLineItems.length === 0) {
+    logger.info('No new line items found, no discounts to apply');
+    return updateActions;
+  }
+
+  logger.info(`Found ${newLineItems.length} new line items to apply discounts to`);
+
+  updateActions.push(...processDiscountsForCustomLineItems(newLineItems));
+  updateActions.push(...processStocks(validLineItems));
+
+  return updateActions;
+}
